@@ -1,0 +1,94 @@
+*{
+    box-sizing: border-box;
+}
+body{
+   text-align: center;
+    color: #000000;
+    font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;  
+    background: #5acbe2;
+}
+.container{
+    display: grid;
+    grid-template-columns: auto;
+    height: 100vh;
+    place-content: center;
+    border-radius: 50px;
+}
+.sub-container{
+    /* width: 50%; */
+    /* height: 50%; */
+   
+    color: white;
+    border-radius: 13px;
+    background: linear-gradient(45deg, #007196, #0087b3);
+    box-shadow:  25px -25px 50px #007095,
+                 -25px 25px 50px #008cb9;
+    padding: 40px;
+}
+
+h1{
+    text-transform: uppercase;
+    font-size: 3rem;
+    letter-spacing: 4px;
+    margin-bottom: 0;
+}
+
+sub{
+    font-style: italic;
+    font-size: 1.4rem;
+    margin-bottom: 2rem;
+}
+
+
+.file-contain{
+    display: flex;
+    min-height: auto;
+    place-content: center;
+}
+
+.fileupload{
+font-size: 18px;
+text-align: center;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  height: 60px;
+  background-color: rgba(119, 109, 109, 0.416);
+  border: 3px solid #ccc;
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 20px 0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.fileupload:hover{
+background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.fileupload:focus{
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+    
+}
+
+.uploadbtn{
+    width: 300px;
+    padding: 12px 8px;
+    font-size: 1.5rem;
+    background-color: #d8bf03;
+    border: none;
+    outline: none;
+    border-radius: 8px;
+}
+
+.uploadbtn:hover{
+    background-color: yellow;
+    cursor: pointer;
+}
+
+.preview{
+    width: 300px;
+}
