@@ -27,5 +27,5 @@ jobs:
         run: |
           docker login -u samuelekedev -p ${{ secrets.DOCKERHUBCI }}
           docker push samuelekedev/python-api-color-extract:${{ env.IMAGE_TAG }}
-          docker push samuelekedev/samuelekedev/devops-color-extractor-frontend:${{ env.IMAGE_TAG }}
+          docker push samuelekedev/devops-color-extractor-frontend:${{ env.IMAGE_TAG }}
       
