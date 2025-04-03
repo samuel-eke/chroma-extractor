@@ -76,7 +76,7 @@ class ColorInfo:
             "is_dark": self.is_dark
         }
 
-def extract_colors(image: Image.Image, num_colors: int = 5) -> List[ColorInfo]:
+def extract_colors(image: Image.Image, num_colors: int = 7) -> List[ColorInfo]:
     """Extract dominant colors from an image using K-means clustering"""
     # Resize image to speed up processing
     image = image.copy()
