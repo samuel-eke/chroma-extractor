@@ -48,10 +48,22 @@ jobs:
 
       - name: Wait for Ingress Controller to be Ready
         run: |
-          kubectl wait --namespace ingress-nginx \
-            --for=condition=ready pod \
-            --selector=app.kubernetes.io/component=controller \
-            --timeout=90s
+          # kubectl wait --namespace ingress-nginx \
+          #   --for=condition=ready pod \
+          #   --selector=app.kubernetes.io/component=controller \
+          #   --timeout=90s
+          attempt=1
+          max_attempts=5
+          until kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s; do
+            if [ $attempt -eq $max_attempts ]; then
+              echo "Max attempts reached, giving up"
+              exit 1
+            fi
+            echo "Attempt $attempt failed, waiting to retry..."
+            attempt=$((attempt+1))
+            sleep 30
+          done
+
 
       - name: Verify Ingress Controller Deployment
         run: |
