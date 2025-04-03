@@ -56,7 +56,7 @@ jobs:
       - name: Verify Ingress Controller Deployment
         run: |
           kubectl get pods -n ingress-nginx
-            - name: Apply Ingress Configuration
+      - name: Apply Ingress Configuration
         run: |
           kubectl apply -f k8s/ingress.yaml
           kubectl get ingress
