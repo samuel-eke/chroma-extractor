@@ -17,5 +17,6 @@ jobs:
 
       - name: push image to docker hub
         run: |
+          docker login -u samuelekedev -p ${{ secrets.DOCKERHUBCI }}
           docker push samuelekedev/python-api-color-extract:1.1
       
