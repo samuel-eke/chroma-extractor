@@ -41,3 +41,24 @@ jobs:
 
       - name: Verify Nodes
         run: kubectl get nodes
+
+      - name: Install NGINX Ingress Controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+      - name: Wait for Ingress Controller to be Ready
+        run: |
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
+
+      - name: Verify Ingress Controller Deployment
+        run: |
+          kubectl get pods -n ingress-nginx
+            - name: Apply Ingress Configuration
+        run: |
+          kubectl apply -f k8s/ingress.yaml
+          kubectl get ingress
+
+
