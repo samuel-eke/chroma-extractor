@@ -116,7 +116,7 @@ def extract_colors(image: Image.Image, num_colors: int = 5) -> List[ColorInfo]:
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Color Palette Analyzer API",
+        "message": "Chroma Extractor API",
         "version": "1.0.0",
         "endpoints": [
             {"path": "/", "method": "GET", "description": "This information"},
@@ -168,5 +168,4 @@ async def analyze_image_with_colors(num_colors: int, file: UploadFile = File(...
     return await analyze_image(file, num_colors)
 
 if __name__ == "__main__":
-    # Run with `python app.py`
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
