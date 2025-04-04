@@ -38,7 +38,7 @@ export function ChromaExtractor() {
     }
   }
 
-  // Handle upload button click
+  // upload button click
   async function uploadImage() {
     if (!selectedFile) {
       alert("Please select an image first");
@@ -59,15 +59,6 @@ export function ChromaExtractor() {
     } catch (error) {
       console.error("Error connecting to backend:", error);
       alert("Failed to process the image. Try again.");
-    }
-  }
-
-  // Trigger file input when the button is clicked
-  function handleUploadButtonClick() {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    } else {
-      uploadImage();
     }
   }
 
