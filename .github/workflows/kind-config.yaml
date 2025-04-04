@@ -1,0 +1,261 @@
+name: Kubernetes Integration Tests
+
+on:
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  k8s-integration-test:
+    name: Run Kubernetes Integration Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install KinD
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+      
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+      
+      - name: Install helm
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+      
+      - name: Create multi-node KinD cluster
+        run: |
+          cat > kind-config.yaml <<EOF
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              protocol: TCP
+          - role: worker
+          - role: worker
+          EOF
+          
+          kind create cluster --config kind-config.yaml --name pr-test-cluster
+          kubectl get nodes
+      
+      - name: Install NGINX Ingress Controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+          
+          echo "Waiting for ingress controller pods to be ready..."
+          kubectl wait --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=90s
+      
+      - name: Install Prometheus and Grafana for monitoring
+        run: |
+          # Add Prometheus Helm repo
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          
+          # Install Prometheus Stack (includes Prometheus, Grafana, and ServiceMonitors)
+          helm install prometheus prometheus-community/kube-prometheus-stack \
+            --set grafana.enabled=true \
+            --set prometheus.service.type=NodePort \
+            --set grafana.service.type=NodePort
+          
+          # Wait for Prometheus and Grafana to be ready
+          kubectl wait --for=condition=ready pod -l app=prometheus --timeout=120s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=prometheus --timeout=120s
+          
+          # Port-forward to access Grafana (in background)
+          kubectl port-forward svc/prometheus-grafana 3000:80 &
+          GRAFANA_PID=$!
+          echo "Grafana PID: $GRAFANA_PID"
+          
+          # Port-forward to access Prometheus (in background)
+          kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 &
+          PROMETHEUS_PID=$!
+          echo "Prometheus PID: $PROMETHEUS_PID"
+          
+          # Save PIDs for later termination
+          echo "$GRAFANA_PID" > grafana_pid.txt
+          echo "$PROMETHEUS_PID" > prometheus_pid.txt
+          
+          # Sleep to ensure port-forwarding is established
+          sleep 10
+      
+      - name: Deploy sample application
+        run: |
+          # Create a simple application to test
+          kubectl create deployment web --image=nginx
+          kubectl create service clusterip web --tcp=80:80
+          kubectl scale deployment web --replicas=3
+          
+          # Create ServiceMonitor for the web app
+          cat > service-monitor.yaml <<EOF
+          apiVersion: monitoring.coreos.com/v1
+          kind: ServiceMonitor
+          metadata:
+            name: web-monitor
+            labels:
+              release: prometheus
+          spec:
+            selector:
+              matchLabels:
+                app: web
+            endpoints:
+            - port: web
+              interval: 5s
+          EOF
+          
+          # Label the service to match the ServiceMonitor
+          kubectl label service web app=web
+          
+          # Apply the ServiceMonitor
+          kubectl apply -f service-monitor.yaml
+          
+          # Create ingress resource
+          cat > ingress.yaml <<EOF
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: web-ingress
+            annotations:
+              nginx.ingress.kubernetes.io/rewrite-target: /
+          spec:
+            rules:
+            - http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: web
+                      port:
+                        number: 80
+          EOF
+          
+          kubectl apply -f ingress.yaml
+          
+          # Wait for pods to be ready
+          kubectl wait --for=condition=available --timeout=60s deployment/web
+      
+      - name: Generate randomized traffic and collect metrics
+        run: |
+          # Install hey load testing tool
+          curl -sf https://gobinaries.com/rakyll/hey | sh
+          
+          # Create results directory
+          mkdir -p test-results
+          
+          # Save cluster resource usage before test
+          kubectl top nodes > test-results/pre-test-node-metrics.txt || echo "kubectl top not available yet"
+          kubectl top pods -A > test-results/pre-test-pod-metrics.txt || echo "kubectl top not available yet"
+          
+          # Run hey with detailed output saved
+          echo "Generating random HTTP traffic to test ingress..."
+          hey -n 1000 -c 20 -z 60s -o csv http://localhost/ > test-results/load-test-results.csv
+          
+          # Create a summary report
+          hey -n 500 -c 10 -z 30s http://localhost/ > test-results/load-test-summary.txt
+          
+          # Get metrics after the load test
+          kubectl top nodes > test-results/post-test-node-metrics.txt || echo "kubectl top not available yet"
+          kubectl top pods -A > test-results/post-test-pod-metrics.txt || echo "kubectl top not available yet"
+          
+          # Get logs from the ingress controller
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=50 > test-results/ingress-logs.txt
+          
+          # Get pod status
+          kubectl get pods -A -o wide > test-results/pod-status.txt
+          
+          # If curl is necessary to fetch Prometheus metrics
+          curl -s http://localhost:9090/api/v1/query?query=nginx_ingress_controller_requests > test-results/prometheus-ingress-metrics.json || echo "Could not fetch Prometheus metrics"
+          
+          # Print summary of the load test
+          echo "=== Load Test Results Summary ==="
+          cat test-results/load-test-summary.txt
+          echo "============================="
+          
+          # Print pod resource usage
+          echo "=== Pod Resource Usage ==="
+          cat test-results/post-test-pod-metrics.txt
+          echo "============================="
+      
+      - name: Generate performance report
+        run: |
+          # Create a simple HTML report from the CSV data
+          cat > test-results/report.html <<EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Load Test Performance Report</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              h1 { color: #333; }
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; }
+              tr:nth-child(even) { background-color: #f9f9f9; }
+            </style>
+          </head>
+          <body>
+            <h1>Load Test Performance Report</h1>
+            <h2>Summary</h2>
+            <pre>$(cat test-results/load-test-summary.txt)</pre>
+            
+            <h2>Pod Resource Usage</h2>
+            <pre>$(cat test-results/post-test-pod-metrics.txt)</pre>
+            
+            <h2>Node Resource Usage</h2>
+            <pre>$(cat test-results/post-test-node-metrics.txt)</pre>
+            
+            <h2>Ingress Controller Logs (Sample)</h2>
+            <pre>$(head -n 20 test-results/ingress-logs.txt)</pre>
+          </body>
+          </html>
+          EOF
+          
+          echo "Performance report generated at test-results/report.html"
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-results
+          path: test-results/
+          retention-days: 14
+      
+      - name: Clean up port forwarding
+        if: always()
+        run: |
+          if [ -f grafana_pid.txt ]; then
+            GRAFANA_PID=$(cat grafana_pid.txt)
+            kill $GRAFANA_PID || true
+          fi
+          
+          if [ -f prometheus_pid.txt ]; then
+            PROMETHEUS_PID=$(cat prometheus_pid.txt)
+            kill $PROMETHEUS_PID || true
+          fi
+      
+      - name: Clean up
+        if: always()
+        run: |
+          kind delete cluster --name pr-test-cluster
