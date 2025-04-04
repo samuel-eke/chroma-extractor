@@ -112,7 +112,7 @@ def extract_colors(image: Image.Image, num_colors: int = 5) -> List[ColorInfo]:
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": "Devops CI Test - Color Extactor API",
+        "message": "Devops CI Test - Color Extactor API Backend",
         "version": "1.0.0",
         "endpoints": [
             {"path": "/", "method": "GET", "description": "This information"},
