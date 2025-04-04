@@ -74,7 +74,7 @@ export function ChromaExtractor() {
   return (
     <div className="container">
       <div className="sub-container">
-        <h1>DevOps Chroma - Image Color Extractor</h1>
+        <h1>DevOps CI Task - Image Color Extractor with Python</h1>
         <sub>Bring the image, we give you the colors</sub>
         
         <div className="file-contain">
