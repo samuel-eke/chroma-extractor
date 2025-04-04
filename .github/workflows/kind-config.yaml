@@ -236,7 +236,7 @@ jobs:
           echo "Performance report generated at test-results/report.html"
       
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: load-test-results
           path: test-results/
